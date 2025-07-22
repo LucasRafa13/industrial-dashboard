@@ -1,11 +1,36 @@
+import { useOutletContext } from 'react-router-dom'
 import { useRealtimeData } from '../hooks/useRealtimeData'
 import AlertsAndOEE from '../components/AlertsAndOEE'
-import { mockAlerts } from '../services/mockData'
+import { mockAlerts, getAlertsByMachineId } from '../services/mockData'
 import MetricChart from '../components/MetricChart'
+import type { MachineStatus } from '../types/MachineStatus'
+import { useMemo } from 'react'
+
+interface DashboardContext {
+  selectedMachine: MachineStatus
+  setSelectedMachine: (machine: MachineStatus) => void
+}
 
 export default function Dashboard() {
-  const data = useRealtimeData()
+  const { selectedMachine } = useOutletContext<DashboardContext>()
+
+  const data = useRealtimeData({
+    machineId: selectedMachine?.id,
+    updateInterval: 3000,
+  })
+
   const { state, metrics } = data
+
+  // Filtrar alertas: se máquina específica selecionada, mostrar só dela; senão, mostrar todos
+  const displayAlerts = useMemo(() => {
+    if (!selectedMachine || selectedMachine.id === 'all') {
+      return mockAlerts
+    }
+
+    const machineAlerts = getAlertsByMachineId(selectedMachine.id)
+
+    return machineAlerts.length > 0 ? machineAlerts : mockAlerts
+  }, [selectedMachine])
 
   const formatUptime = (uptime: number) => {
     const h = Math.floor(uptime)
@@ -23,6 +48,11 @@ export default function Dashboard() {
           <p className="text-gray-600 dark:text-gray-300">
             Status: {state === 'RUNNING' ? 'Ligada' : state}
           </p>
+          {selectedMachine?.metrics.pressure && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Pressão: {selectedMachine.metrics.pressure} PSI
+            </p>
+          )}
         </div>
 
         <div className="p-4 bg-white dark:bg-gray-800 rounded shadow border border-gray-200 dark:border-gray-700 transition-all duration-300 hover:shadow-lg">
@@ -33,6 +63,11 @@ export default function Dashboard() {
             {metrics.temperature.toFixed(1)}°C{' '}
             {metrics.temperature >= 78 ? '▲' : '▼'}
           </p>
+          {selectedMachine?.metrics.vibration && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Vibração: {selectedMachine.metrics.vibration} mm/s
+            </p>
+          )}
         </div>
 
         <div className="p-4 bg-white dark:bg-gray-800 rounded shadow border border-gray-200 dark:border-gray-700 transition-all duration-300 hover:shadow-lg">
@@ -42,6 +77,11 @@ export default function Dashboard() {
           <p className="text-gray-600 dark:text-gray-300">
             {metrics.rpm.toFixed(0)} {metrics.rpm >= 1200 ? '▲' : '▼'}
           </p>
+          {selectedMachine?.metrics.power && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Potência: {selectedMachine.metrics.power} kW
+            </p>
+          )}
         </div>
 
         <div className="p-4 bg-white dark:bg-gray-800 rounded shadow border border-gray-200 dark:border-gray-700 transition-all duration-300 hover:shadow-lg">
@@ -51,10 +91,17 @@ export default function Dashboard() {
           <p className="text-gray-600 dark:text-gray-300">
             {formatUptime(metrics.uptime)}
           </p>
+          {selectedMachine?.name && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              {selectedMachine.name}
+            </p>
+          )}
         </div>
       </div>
+
       <MetricChart metric={data.metrics} />
-      <AlertsAndOEE alerts={mockAlerts} oee={data.oee} />
+
+      <AlertsAndOEE alerts={displayAlerts} oee={data.oee} />
     </>
   )
 }

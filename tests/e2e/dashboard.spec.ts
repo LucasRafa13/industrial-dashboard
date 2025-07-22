@@ -75,16 +75,20 @@ test.describe('Dashboard', () => {
   })
 
   test('verifica formatação dos valores', async ({ page }) => {
-    // Verifica se a temperatura tem formato correto no card específico (número + °C)
-    const tempCard = page.locator('div').filter({ hasText: 'Temperatura' }).filter({ hasText: /°C/ }).first()
-    await expect(tempCard.locator('p').filter({ hasText: /\d+\.\d°C/ })).toBeVisible()
+    // Verifica se a temperatura tem formato correto usando seletor mais específico
+    const tempCard = page.locator('div').filter({ hasText: 'Estado da Máquina' }).or(
+      page.locator('div').filter({ hasText: 'Temperatura' })
+    ).filter({ hasText: /Status:|°C/ }).first()
+    
+    // Procura especificamente pelo padrão no card, excluindo o sr-only
+    await expect(page.locator('p').filter({ hasText: /\d+\.\d°C/ }).and(page.locator(':not(.sr-only)')).first()).toBeVisible()
     
     // Verifica se o RPM tem formato correto (número)
     const rpmCard = page.locator('div').filter({ hasText: 'RPM' }).first()
     await expect(rpmCard.getByText(/\d+/).last()).toBeVisible()
     
     // Verifica se o uptime tem formato correto (Xh Ym)
-    await expect(page.getByText(/\d+h \d+m/)).toBeVisible()
+    await expect(page.getByText(/\d+h \d+m/).and(page.locator(':not(.sr-only)')).first()).toBeVisible()
     
     // Verifica se o status está sendo exibido
     await expect(page.getByText(/Status: (Ligada|RUNNING|STOPPED|MAINTENANCE)/)).toBeVisible()

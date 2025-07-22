@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import type { MachineStatus } from '../types/MachineStatus'
-import { mockMachineStatus } from '../services/mockData'
+import { mockMachinesData, getMachineById } from '../services/mockData'
 import type { MetricHistory } from '../types/MetricHistory'
 
 interface UseRealtimeDataOptions {
+  machineId?: string
   updateInterval?: number
   maxHistorySize?: number
   enablePersistence?: boolean
@@ -33,136 +34,178 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue
 }
 
-// Hook customizado para gerenciar persistência de dados
-function usePersistentState<T>(
-  key: string,
-  defaultValue: T,
-  enabled: boolean = true,
-): [T, (value: T | ((prev: T) => T)) => void] {
-  const [state, setState] = useState<T>(() => {
-    if (!enabled) return defaultValue
-
-    try {
-      const saved = localStorage.getItem(key)
-      return saved ? JSON.parse(saved) : defaultValue
-    } catch {
-      return defaultValue
-    }
-  })
-
-  const setPersistentState = useCallback(
-    (value: T | ((prev: T) => T)) => {
-      setState((prev) => {
-        const newValue =
-          typeof value === 'function' ? (value as Function)(prev) : value
-
-        if (enabled) {
-          try {
-            localStorage.setItem(key, JSON.stringify(newValue))
-          } catch (error) {
-            console.warn('Failed to persist state:', error)
-          }
-        }
-
-        return newValue
-      })
-    },
-    [key, enabled],
-  )
-
-  return [state, setPersistentState]
-}
-
 export const useRealtimeData = (
   options: UseRealtimeDataOptions = {},
 ): UseRealtimeDataReturn => {
   const {
+    machineId,
     updateInterval = 3000,
     maxHistorySize = 30,
-    enablePersistence = true,
   } = options
 
+  // Buscar máquina inicial
+  const initialMachine = useMemo(() => {
+    if (machineId) {
+      return getMachineById(machineId) || mockMachinesData[0]
+    }
+    return mockMachinesData[0]
+  }, [machineId])
+
   // Estados principais
-  const [status, setStatus] = useState<MachineStatus>(mockMachineStatus)
+  const [status, setStatus] = useState<MachineStatus>(initialMachine)
   const [isConnected, setIsConnected] = useState(true)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [connectionAttempts, setConnectionAttempts] = useState(0)
 
+  // Referências para cleanup e controle
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const lastUpdateRef = useRef<Date>(new Date())
-  const simulationStateRef = useRef({
-    temperatureTrend: 0,
-    rpmTrend: 0,
-    stabilityCounter: 0,
-  })
-
-  // Estado persistente para histórico
-  const [history, setHistory] = usePersistentState<MetricHistory[]>(
-    'metricHistory',
-    [],
-    enablePersistence,
+  const simulationStateRef = useRef(
+    new Map<
+      string,
+      {
+        temperatureTrend: number
+        rpmTrend: number
+        stabilityCounter: number
+      }
+    >(),
   )
 
-  // Debounced status para reduzir re-renders
-  const debouncedStatus = useDebounce(status, 100)
+  // Estado persistente para histórico por máquina
+  const [history, setHistory] = useState<MetricHistory[]>([])
 
-  const generateNewMetrics = useCallback((currentStatus: MachineStatus) => {
-    const { temperatureTrend, rpmTrend, stabilityCounter } =
-      simulationStateRef.current
-    const now = new Date()
-    const timeDelta = (now.getTime() - lastUpdateRef.current.getTime()) / 1000
-
-    // Simulação mais realística com tendências
-    let tempChange = (Math.random() - 0.5) * 2
-    let rpmChange = (Math.random() - 0.5) * 20
-
-    // Aplicar tendências para criar padrões mais realísticos
-    if (stabilityCounter > 5) {
-      // Período de estabilidade
-      tempChange *= 0.3
-      rpmChange *= 0.3
-      simulationStateRef.current.stabilityCounter = 0
-    } else {
-      simulationStateRef.current.stabilityCounter++
+  // Inicializar estado da simulação para a máquina
+  const getSimulationState = useCallback((machineId: string) => {
+    if (!simulationStateRef.current.has(machineId)) {
+      simulationStateRef.current.set(machineId, {
+        temperatureTrend: 0,
+        rpmTrend: 0,
+        stabilityCounter: 0,
+      })
     }
-
-    tempChange += temperatureTrend * 0.1
-    rpmChange += rpmTrend * 0.1
-
-    if (Math.random() < 0.1) {
-      simulationStateRef.current.temperatureTrend = (Math.random() - 0.5) * 4
-      simulationStateRef.current.rpmTrend = (Math.random() - 0.5) * 40
-    }
-
-    const newTemp = Math.min(
-      90,
-      Math.max(60, currentStatus.metrics.temperature + tempChange),
-    )
-    const newRpm = Math.max(
-      800,
-      Math.min(1500, currentStatus.metrics.rpm + rpmChange),
-    )
-
-    const tempEfficiency = newTemp < 85 ? 1 : 0.9
-    const rpmEfficiency = newRpm >= 1100 && newRpm <= 1400 ? 1 : 0.85
-    const newEfficiency = Math.min(
-      100,
-      Math.max(
-        70,
-        tempEfficiency * rpmEfficiency * 95 + (Math.random() * 10 - 5),
-      ),
-    )
-
-    return {
-      temperature: newTemp,
-      rpm: newRpm,
-      efficiency: newEfficiency,
-      uptime: currentStatus.metrics.uptime + timeDelta / 3600,
-    }
+    return simulationStateRef.current.get(machineId)!
   }, [])
 
+  // Função otimizada para gerar novos dados por tipo de máquina
+  const generateNewMetrics = useCallback(
+    (currentStatus: MachineStatus) => {
+      const now = new Date()
+      const timeDelta = (now.getTime() - lastUpdateRef.current.getTime()) / 1000
+
+      // Máquina em manutenção ou parada não gera dados
+      if (
+        currentStatus.state === 'MAINTENANCE' ||
+        currentStatus.state === 'STOPPED'
+      ) {
+        return currentStatus.metrics
+      }
+
+      let tempChange = (Math.random() - 0.5) * 2
+      let rpmChange = (Math.random() - 0.5) * 20
+
+      // Comportamento específico por tipo de máquina
+      const machineType = currentStatus.name?.toLowerCase() || ''
+
+      if (machineType.includes('forno')) {
+        // Fornos têm temperatura muito alta e mais estável
+        tempChange *= 0.1
+        const baseTemp = 1850
+        const newTemp = Math.min(2000, Math.max(1800, baseTemp + tempChange))
+        return {
+          ...currentStatus.metrics,
+          temperature: newTemp,
+          rpm: Math.max(
+            10,
+            Math.min(20, currentStatus.metrics.rpm + (Math.random() - 0.5) * 2),
+          ),
+          uptime: currentStatus.metrics.uptime + timeDelta / 3600,
+          efficiency: Math.min(
+            100,
+            Math.max(
+              85,
+              currentStatus.metrics.efficiency + (Math.random() - 0.5) * 2,
+            ),
+          ),
+        }
+      }
+
+      if (machineType.includes('resfri')) {
+        // Sistemas de resfriamento têm temperatura baixa
+        const newTemp = Math.min(30, Math.max(15, 22 + tempChange * 0.5))
+        return {
+          ...currentStatus.metrics,
+          temperature: newTemp,
+          rpm: Math.max(
+            800,
+            Math.min(900, currentStatus.metrics.rpm + rpmChange * 0.3),
+          ),
+          uptime: currentStatus.metrics.uptime + timeDelta / 3600,
+          efficiency: Math.min(
+            100,
+            Math.max(
+              90,
+              currentStatus.metrics.efficiency + (Math.random() - 0.5) * 1,
+            ),
+          ),
+        }
+      }
+
+      if (machineType.includes('compressor')) {
+        // Compressores têm RPM mais alto e temperatura moderada
+        const newTemp = Math.min(
+          90,
+          Math.max(70, currentStatus.metrics.temperature + tempChange),
+        )
+        const newRpm = Math.max(
+          1600,
+          Math.min(1800, currentStatus.metrics.rpm + rpmChange),
+        )
+        return {
+          ...currentStatus.metrics,
+          temperature: newTemp,
+          rpm: newRpm,
+          uptime: currentStatus.metrics.uptime + timeDelta / 3600,
+          efficiency: Math.min(
+            100,
+            Math.max(
+              80,
+              currentStatus.metrics.efficiency + (Math.random() - 0.5) * 3,
+            ),
+          ),
+        }
+      }
+
+      // Comportamento padrão para outras máquinas
+      const newTemp = Math.min(
+        90,
+        Math.max(60, currentStatus.metrics.temperature + tempChange),
+      )
+      const newRpm = Math.max(
+        800,
+        Math.min(1500, currentStatus.metrics.rpm + rpmChange),
+      )
+      const newEfficiency = Math.min(
+        100,
+        Math.max(
+          70,
+          currentStatus.metrics.efficiency + (Math.random() - 0.5) * 2,
+        ),
+      )
+
+      return {
+        ...currentStatus.metrics,
+        temperature: newTemp,
+        rpm: newRpm,
+        uptime: currentStatus.metrics.uptime + timeDelta / 3600,
+        efficiency: newEfficiency,
+      }
+    },
+    [getSimulationState],
+  )
+
+  // Função para simular perda de conexão ocasional
   const simulateConnection = useCallback(() => {
-    const shouldDisconnect = Math.random() < 0.02 
+    const shouldDisconnect = Math.random() < 0.01 // 1% chance
 
     if (shouldDisconnect && isConnected) {
       setIsConnected(false)
@@ -172,8 +215,7 @@ export const useRealtimeData = (
 
     if (!isConnected) {
       setConnectionAttempts((prev) => prev + 1)
-      // Reconecta após algumas tentativas
-      if (connectionAttempts > 3) {
+      if (connectionAttempts > 2) {
         setIsConnected(true)
         setConnectionAttempts(0)
         return true
@@ -184,13 +226,12 @@ export const useRealtimeData = (
     return true
   }, [isConnected, connectionAttempts])
 
+  // Função principal de atualização
   const updateStatus = useCallback(() => {
     const connected = simulateConnection()
     const now = new Date()
 
-    if (!connected) {
-      return
-    }
+    if (!connected) return
 
     setStatus((prevStatus) => {
       const newMetrics = generateNewMetrics(prevStatus)
@@ -206,19 +247,28 @@ export const useRealtimeData = (
           ),
           performance: Math.min(
             100,
-            Math.max(75, (newMetrics.rpm / 1400) * 100),
+            Math.max(
+              75,
+              newMetrics.rpm > 0
+                ? (newMetrics.rpm /
+                    (prevStatus.name?.includes('compressor') ? 1700 : 1400)) *
+                    100
+                : 100,
+            ),
           ),
           quality: Math.min(100, Math.max(80, newMetrics.efficiency)),
-          overall: 0, 
+          overall: 0,
         },
       }
 
+      // Calcular OEE geral
       updatedStatus.oee.overall =
         (updatedStatus.oee.availability *
           updatedStatus.oee.performance *
           updatedStatus.oee.quality) /
         10000
 
+      // Atualizar histórico
       const newHistoryEntry: MetricHistory = {
         timestamp: now,
         temperature: newMetrics.temperature,
@@ -236,8 +286,20 @@ export const useRealtimeData = (
 
       return updatedStatus
     })
-  }, [generateNewMetrics, simulateConnection, maxHistorySize, setHistory])
+  }, [generateNewMetrics, simulateConnection, maxHistorySize])
 
+  // Atualizar máquina quando machineId muda
+  useEffect(() => {
+    if (machineId) {
+      const machine = getMachineById(machineId)
+      if (machine) {
+        setStatus(machine)
+        setHistory([]) // Limpar histórico ao trocar máquina
+      }
+    }
+  }, [machineId])
+
+  // Qualidade da conexão
   const connectionQuality = useMemo(() => {
     if (!isConnected) return 'disconnected'
     if (!lastUpdate) return 'excellent'
@@ -250,9 +312,9 @@ export const useRealtimeData = (
     return 'disconnected'
   }, [isConnected, lastUpdate, updateInterval])
 
+  // Configurar interval
   useEffect(() => {
     updateStatus()
-
     intervalRef.current = setInterval(updateStatus, updateInterval)
 
     return () => {
@@ -263,14 +325,7 @@ export const useRealtimeData = (
     }
   }, [updateStatus, updateInterval])
 
-  useEffect(() => {
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-      }
-    }
-  }, [])
-
+  // Pausa/retoma baseado na visibilidade da aba
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
@@ -280,7 +335,7 @@ export const useRealtimeData = (
         }
       } else {
         if (!intervalRef.current) {
-          updateStatus() // Update imediato
+          updateStatus()
           intervalRef.current = setInterval(updateStatus, updateInterval)
         }
       }
@@ -293,18 +348,8 @@ export const useRealtimeData = (
     }
   }, [updateStatus, updateInterval])
 
-  useEffect(() => {
-    const handleOnline = () => setIsConnected(true)
-    const handleOffline = () => setIsConnected(false)
-
-    window.addEventListener('online', handleOnline)
-    window.addEventListener('offline', handleOffline)
-
-    return () => {
-      window.removeEventListener('online', handleOnline)
-      window.removeEventListener('offline', handleOffline)
-    }
-  }, [])
+  // Debounced status para performance
+  const debouncedStatus = useDebounce(status, 100)
 
   return {
     ...debouncedStatus,
