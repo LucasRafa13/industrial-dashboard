@@ -269,6 +269,7 @@ npm run build-storybook
 ```
 
 **Funcionalidades disponíveis:**
+
 - 🎛️ **Controls**: Altere props dos componentes dinamicamente
 - 📐 **Viewport**: Teste responsividade em diferentes tamanhos
 - ♿ **Accessibility**: Verifique conformidade com WCAG
@@ -402,13 +403,6 @@ const data = useRealtimeData({
 - 🎨 **Alto contraste** opcional
 - 📝 **Skip links** para navegação rápida
 - 🔊 **Anúncios** de mudanças de estado
-
-### PWA Features
-
-- 📱 **Instalável** como app nativo
-- 🔄 **Service Worker** para cache
-- 📴 **Suporte offline** com dados simulados
-- 📋 **Manifest** completo
 
 ### Design System
 
