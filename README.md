@@ -140,7 +140,6 @@ industrial-dashboard/
 │   └── 📁 e2e/
 │       └── dashboard.spec.ts       # 6 cenários de teste
 ├── 📁 public/              # Arquivos públicos
-│   ├── manifest.json       # Manifest PWA
 ├── 📄 .storybook/          # Configuração do Storybook
 │   ├── main.ts             # Configuração principal
 │   └── preview.ts          # Configuração de preview
