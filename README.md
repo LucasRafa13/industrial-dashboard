@@ -11,6 +11,7 @@
 - [Instalação](#-instalação)
 - [Como Executar](#-como-executar)
 - [Testes](#-testes)
+- [Storybook](#-storybook)
 - [Arquitetura](#-arquitetura)
 - [Componentes Principais](#-componentes-principais)
 - [Decisões Técnicas](#-decisões-técnicas)
@@ -31,6 +32,7 @@ Dashboard desenvolvido para monitoramento industrial em tempo real, focado em **
 - ⚡ **Performance otimizada** com React.memo, useMemo e debounce
 - ♿ **Acessibilidade completa** (ARIA, navegação por teclado, screen readers)
 - 🧪 **Testes E2E** com Playwright (6 cenários de teste)
+- 📚 **Storybook** para documentação interativa de componentes
 
 ## 🚀 Funcionalidades
 
@@ -68,6 +70,7 @@ Dashboard desenvolvido para monitoramento industrial em tempo real, focado em **
 - [x] **Modo Dark/Light** funcional
 - [x] **Histórico persistente** (LocalStorage)
 - [x] **Testes E2E** completos (Playwright)
+- [x] **Storybook** para documentação de componentes
 - [x] **Otimizações de performance** avançadas
 - [x] **Acessibilidade completa** (WCAG 2.1)
 - [x] **10 máquinas diferentes** com métricas específicas
@@ -92,6 +95,7 @@ Dashboard desenvolvido para monitoramento industrial em tempo real, focado em **
 ### Ferramentas de Desenvolvimento
 
 - **Playwright 1.49** - Testes E2E
+- **Storybook 8.0** - Documentação de componentes
 - **ESLint 9.15** - Linting de código
 - **PostCSS 8.5** - Processamento CSS
 - **TypeScript ESLint 8.18** - Linting TypeScript
@@ -120,6 +124,10 @@ industrial-dashboard/
 │   │   └── NotFound.tsx            # Página 404
 │   ├── 📁 services/        # Camada de dados
 │   │   └── mockData.ts             # 10 máquinas + 10 alertas realistas
+│   ├── 📁 stories/         # Stories do Storybook
+│   │   ├── Button.stories.ts       # Stories dos componentes
+│   │   ├── MetricChart.stories.ts  # Stories do gráfico
+│   │   └── AlertsAndOEE.stories.ts # Stories de alertas e OEE
 │   ├── 📁 types/           # Definições TypeScript
 │   │   ├── MachineStatus.ts        # Interface das máquinas
 │   │   ├── Alert.ts               # Interface dos alertas
@@ -133,6 +141,9 @@ industrial-dashboard/
 │       └── dashboard.spec.ts       # 6 cenários de teste
 ├── 📁 public/              # Arquivos públicos
 │   ├── manifest.json       # Manifest PWA
+├── 📄 .storybook/          # Configuração do Storybook
+│   ├── main.ts             # Configuração principal
+│   └── preview.ts          # Configuração de preview
 ├── 📄 package.json         # Dependências e scripts
 ├── 📄 playwright.config.ts # Configuração Playwright
 ├── 📄 tailwind.config.ts   # Configuração Tailwind
@@ -183,6 +194,16 @@ npm run build
 npm run preview
 ```
 
+### Storybook (Documentação de Componentes)
+
+```bash
+npm run storybook
+# ou
+yarn storybook
+```
+
+🌐 Acesse: `http://localhost:6006`
+
 ### Linting
 
 ```bash
@@ -217,6 +238,42 @@ npx playwright test dashboard.spec.ts
 4. ✅ **Atualização de dados** - Verifica se os dados estão sendo atualizados
 5. ✅ **Responsividade** - Testa em viewport mobile e desktop
 6. ✅ **Formatação de valores** - Verifica formatação de temperatura, RPM e uptime
+
+## 📚 Storybook
+
+O projeto inclui **Storybook** para documentação interativa e desenvolvimento isolado de componentes.
+
+### 🎯 Componentes Documentados
+
+- **🎨 ThemeToggle** - Alternador de tema dark/light
+- **📊 MetricChart** - Gráfico de métricas em tempo real
+- **🚨 AlertsAndOEE** - Sistema de alertas e métricas OEE
+- **🏭 MachineSelector** - Seletor de máquinas industriais
+- **📱 Cards de Métricas** - Cards responsivos com indicadores
+
+### ✨ Features do Storybook
+
+- **🎨 Controles interativos** - Modificar props em tempo real
+- **📱 Testes de responsividade** - Diferentes viewports
+- **🌙 Modo dark/light** - Visualizar componentes em ambos os temas
+- **♿ Testes de acessibilidade** - Verificação automática de ARIA
+- **📖 Documentação automática** - Props e tipos TypeScript
+
+### 🚀 Como usar o Storybook
+
+```bash
+# Iniciar o Storybook
+npm run storybook
+
+# Build do Storybook para produção
+npm run build-storybook
+```
+
+**Funcionalidades disponíveis:**
+- 🎛️ **Controls**: Altere props dos componentes dinamicamente
+- 📐 **Viewport**: Teste responsividade em diferentes tamanhos
+- ♿ **Accessibility**: Verifique conformidade com WCAG
+- 📖 **Docs**: Documentação automática com exemplos de código
 
 ## 🏗 Arquitetura
 
@@ -324,6 +381,10 @@ const data = useRealtimeData({
 
 **Por quê**: Detecção precoce de erros, melhor DX, código mais robusto
 
+### 7. **Storybook para Design System**
+
+**Por quê**: Documentação viva, desenvolvimento isolado, facilita colaboração em equipe
+
 ## 🎨 Funcionalidades Avançadas
 
 ### Performance Optimizations
@@ -350,6 +411,13 @@ const data = useRealtimeData({
 - 📴 **Suporte offline** com dados simulados
 - 📋 **Manifest** completo
 
+### Design System
+
+- 📚 **Storybook** para documentação de componentes
+- 🎨 **Design tokens** consistentes via Tailwind
+- 🧩 **Componentes reutilizáveis** bem documentados
+- 🔄 **Testes visuais** automáticos
+
 ## 🎯 Como Usar
 
 ### 1. **Dashboard Principal**
@@ -374,6 +442,12 @@ const data = useRealtimeData({
 - Desktop: Layout completo em grade
 - Tablet: Adaptação automática
 - Mobile: Stack vertical otimizado
+
+### 5. **Storybook**
+
+- Explore componentes isoladamente
+- Teste diferentes props e estados
+- Verifique documentação e exemplos
 
 ## 📊 Dados Simulados
 
@@ -405,18 +479,21 @@ const data = useRealtimeData({
 - [ ] **Exportação de relatórios** PDF/Excel
 - [ ] **Integração IoT** com sensores reais
 - [ ] **Machine Learning** para predição de falhas
+- [ ] **Testes visuais automáticos** com Chromatic
+- [ ] **Componentes mais avançados** no Storybook
 
 ## 👨‍💻 Autor
 
 **Lucas Lima** - Desenvolvedor Full Stack  
 📧 Email: lucasrafael123araujolima@gmail.com
-🐙 GitHub: [@luke](https://github.com/LucasRafa13)
+🐙 GitHub: [@LucasRafa13](https://github.com/LucasRafa13)
 
 ---
 
 ## 📄 Licença
 
-Este projeto foi desenvolvido como **desafio técnico** para demonstração de habilidades em React, TypeScript etc.
+Este projeto foi desenvolvido como **desafio técnico** para demonstração de habilidades em React, TypeScript, Storybook e ferramentas modernas de desenvolvimento frontend.
+
 ---
 
 **⭐ Se este projeto foi útil, considere dar uma estrela!**
